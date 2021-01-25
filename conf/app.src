@@ -1,7 +1,7 @@
-SOURCE_URL=url of app's source
-SOURCE_SUM=sha256 checksum
+SOURCE_URL=https://github.com/LaBaude32/PvApp_Client_Web/archive/v0.1.1-beta.zip
+SOURCE_SUM=507730758f3355715e24de4bf67546a81a301a47ab78934136fb9e26e3cfa26e
 SOURCE_SUM_PRG=sha256sum
-SOURCE_FORMAT=tar.gz
+SOURCE_FORMAT=zip
 SOURCE_IN_SUBDIR=true
-SOURCE_FILENAME=
+SOURCE_FILENAME=PvApp_Client_Web-0.1.1-beta.zip
 SOURCE_EXTRACT=true

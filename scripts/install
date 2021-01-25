@@ -28,8 +28,6 @@ domain=$YNH_APP_ARG_DOMAIN
 path_url=$YNH_APP_ARG_PATH
 admin=$YNH_APP_ARG_ADMIN
 is_public=$YNH_APP_ARG_IS_PUBLIC
-language=$YNH_APP_ARG_LANGUAGE
-password=$YNH_APP_ARG_PASSWORD
 
 ### If it's a multi-instance app, meaning it can be installed several times independently
 ### The id of the app as stated in the manifest is available as $YNH_APP_ID
@@ -72,7 +70,7 @@ ynh_script_progression --message="Storing installation settings..." --time --wei
 ynh_app_setting_set --app=$app --key=domain --value=$domain
 ynh_app_setting_set --app=$app --key=path --value=$path_url
 ynh_app_setting_set --app=$app --key=admin --value=$admin
-ynh_app_setting_set --app=$app --key=language --value=$language
+ynh_app_setting_set --app=$app --key=is_public --value=$is_public
 
 #=================================================
 # STANDARD MODIFICATIONS
@@ -112,25 +110,8 @@ ynh_script_progression --message="Installing dependencies..." --time --weight=1
 ###		- And the section "UPGRADE DEPENDENCIES" in the upgrade script
 
 ynh_install_app_dependencies $pkg_dependencies
-
-#=================================================
-# CREATE A MYSQL DATABASE
-#=================================================
-ynh_script_progression --message="Creating a MySQL database..." --time --weight=1
-
-### Use these lines if you need a database for the application.
-### `ynh_mysql_setup_db` will create a database, an associated user and a ramdom password.
-### The password will be stored as 'mysqlpwd' into the app settings,
-### and will be available as $db_pwd
-### If you're not using these lines:
-###		- Remove the section "BACKUP THE MYSQL DATABASE" in the backup script
-###		- Remove also the section "REMOVE THE MYSQL DATABASE" in the remove script
-###		- As well as the section "RESTORE THE MYSQL DATABASE" in the restore script
-
-db_name=$(ynh_sanitize_dbid --db_name=$app)
-db_user=$db_name
-ynh_app_setting_set --app=$app --key=db_name --value=$db_name
-ynh_mysql_setup_db --db_user=$db_user --db_name=$db_name
+ynh_install_nodejs --nodejs_version=$nodejsversion
+ynh_use_nodejs
 
 #=================================================
 # DOWNLOAD, CHECK AND UNPACK SOURCE
@@ -161,26 +142,7 @@ ynh_add_nginx_config
 ynh_script_progression --message="Configuring system user..." --time --weight=1
 
 # Create a system user
-ynh_system_user_create --username=$app
-
-#=================================================
-# PHP-FPM CONFIGURATION
-#=================================================
-ynh_script_progression --message="Configuring PHP-FPM..." --time --weight=1
-
-### `ynh_add_fpm_config` is used to set up a PHP config.
-### You can remove it if your app doesn't use PHP.
-### `ynh_add_fpm_config` will use the files conf/php-fpm.conf
-### If you're not using these lines:
-###		- You can remove these files in conf/.
-###		- Remove the section "BACKUP THE PHP-FPM CONFIGURATION" in the backup script
-###		- Remove also the section "REMOVE PHP-FPM CONFIGURATION" in the remove script
-###		- As well as the section "RESTORE THE PHP-FPM CONFIGURATION" in the restore script
-###		  with the reload at the end of the script.
-###		- And the section "PHP-FPM CONFIGURATION" in the upgrade script
-
-# Create a dedicated PHP-FPM config
-ynh_add_fpm_config
+ynh_system_user_create --username=$app --home_dir="$final_path"
 
 #=================================================
 # SPECIFIC SETUP
@@ -205,7 +167,7 @@ ynh_script_progression --message="Configuring a systemd service..." --time --wei
 ###		- And the section "SETUP SYSTEMD" in the upgrade script
 
 # Create a dedicated systemd config
-ynh_add_systemd_config
+ynh_add_systemd_config --others_var="ynh_node"
 
 #=================================================
 # SETUP APPLICATION WITH CURL
@@ -243,7 +205,12 @@ ynh_permission_update --permission="main" --remove="visitors"
 ### `ynh_replace_string` is used to replace a string in a file.
 ### (It's compatible with sed regular expressions syntax)
 
-ynh_replace_string --match_string="match_string" --replace_string="replace_string" --target_file="$final_path/CONFIG_FILE"
+#ynh_replace_string --match_string="match_string" --replace_string="replace_string" --target_file="$final_path/CONFIG_FILE"
+
+ynh_script_progression --message="Modifying a config file..."
+
+# Create a dedicated .env config
+ynh_add_config --template=".env" --destination="$final_path/.env"
 
 #=================================================
 # STORE THE CONFIG FILE CHECKSUM
@@ -254,7 +221,8 @@ ynh_replace_string --match_string="match_string" --replace_string="replace_strin
 ### you can make a backup of this file before modifying it again if the admin had modified it.
 
 # Calculate and store the config file checksum into the app settings
-ynh_store_file_checksum --file="$final_path/CONFIG_FILE"
+
+#ynh_store_file_checksum --file="$final_path/CONFIG_FILE"
 
 #=================================================
 # GENERIC FINALIZATION
@@ -272,7 +240,7 @@ chown -R root: $final_path
 #=================================================
 # SETUP LOGROTATE
 #=================================================
-ynh_script_progression --message="Configuring log rotation..." --time --weight=1
+# ynh_script_progression --message="Configuring log rotation..." --time --weight=1
 
 ### `ynh_use_logrotate` is used to configure a logrotate configuration for the logs of this app.
 ### Use this helper only if there is effectively a log file for this app.
@@ -283,14 +251,14 @@ ynh_script_progression --message="Configuring log rotation..." --time --weight=1
 ###		- And the section "SETUP LOGROTATE" in the upgrade script
 
 # Use logrotate to manage application logfile(s)
-ynh_use_logrotate
+# ynh_use_logrotate
 
 #=================================================
 # INTEGRATE SERVICE IN YUNOHOST
 #=================================================
 ynh_script_progression --message="Integrating service in YunoHost..." --time --weight=1
 
-### `yunohost service add` integrates a service in YunoHost. It then gets 
+### `yunohost service add` integrates a service in YunoHost. It then gets
 ### displayed in the admin interface and through the others `yunohost service` commands.
 ### (N.B.: this line only makes sense if the app adds a service to the system!)
 ### If you're not using these lines:
@@ -299,7 +267,7 @@ ynh_script_progression --message="Integrating service in YunoHost..." --time --w
 ###		- As well as the section "INTEGRATE SERVICE IN YUNOHOST" in the restore script
 ###		- And the section "INTEGRATE SERVICE IN YUNOHOST" in the upgrade script
 
-yunohost service add $app --description="A short description of the app" --log="/var/log/$app/$app.log"
+yunohost service add $app --description="PvApp deamon" --log="/var/log/$app/$app.log"
 
 ### Additional options starting with 3.8:
 ###
