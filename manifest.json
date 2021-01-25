@@ -10,7 +10,7 @@
     "license": "non-free",
     "maintainer": {
         "name": "Baudouin Coupey",
-        "email": "baudouin.coupey@protonmail.com",
+        "email": "baudouin.coupey@protonmail.com"
     },
     "requirements": {
         "yunohost": ">= 4.1.3"
